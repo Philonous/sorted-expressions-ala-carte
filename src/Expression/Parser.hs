@@ -15,6 +15,7 @@ import Data.Kind
 import Data.Proxy
 import Data.Text
 import Data.Typeable
+import Data.Singletons.Decide
 
 import Expression hiding ( Const, var )
 import Utils.Indexed.Fixpoint
@@ -72,13 +73,12 @@ sort = choice [ bool, int, array ] <?> "Sort" where
         sort' = choice [ bool, int, char '(' *> array <* char ')' ]
 
         array' :: DynamicSort -> DynamicSort -> DynamicSort
-        array' (DynamicSort (i :: SSort i))
-               (DynamicSort (e :: SSort e)) = DynamicSort (SArraySort i e)
+        array' (DynamicSort i) (DynamicSort e) = DynamicSort (SArraySort i e)
 
 var :: forall f. VarF :<: f => Parser (DynamicallySorted f)
 var = var' <$> (char '(' *> many1 letter) <*> (space *> char ':' *> space *> sort <* char ')') <?> "Var" where
     var' :: VariableName -> DynamicSort -> DynamicallySorted f
-    var' n (DynamicSort (s :: SSort s)) =
+    var' n (DynamicSort (s :: Sing s)) =
       -- This shouldn't be necessary once DynamicallySorted is fixed
         withTypeableSort s $ DynamicallySorted s $ E.var n s
 
@@ -158,12 +158,18 @@ array rec = choice [ select, store ] <?> "Array" where
     store  = store'  <$> (char '(' *> string "store"  *> space *> rec) <*> (space *> rec) <*> (space *> rec <* char ')')
 
     select' :: DynamicallySorted f -> DynamicallySorted f -> DynamicallySorted f
-    select' (DynamicallySorted ss1@(SArraySort _ ss3) a)
-            (DynamicallySorted ss2                    i)
-               = case sortEq ss1 (SArraySort ss2 ss3) of
-                       Just Refl -> withTypeableSort ss3
-                                       $ DynamicallySorted ss3 (E.select a i)
-                       Nothing   -> error ""
+    -- select' (DynamicallySorted ss1@(SArraySort _ ss3) a)
+    --         (DynamicallySorted ss2                    i)
+    --            = case sortEq ss1 (SArraySort ss2 ss3) of
+    --                    Just Refl -> withTypeableSort ss3
+    --                                    $ DynamicallySorted ss3 (E.select a i)
+    --                    Nothing   -> error ""
+    select' (DynamicallySorted (SArraySort si1 se1) a)
+            (DynamicallySorted s2               i)
+               = case si1 %~ s2 of
+                       Proved Refl -> withTypeableSort se1
+                                      $ DynamicallySorted se1 (E.select a i)
+                       Disproved _   -> error ""
     select' _ _ = error "selecting from non-array"
     store'  (DynamicallySorted as@(SArraySort _ _) (a :: IFix f s1))
             (DynamicallySorted _                   (i :: IFix f s2))

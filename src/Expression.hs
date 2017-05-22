@@ -42,7 +42,7 @@ type   ALia  = IFix   ALiaF
 type VariableName = String
 
 data VarF a (s :: Sort) where
-    Var :: VariableName -> SSort s -> VarF a s
+    Var :: VariableName -> Sing s -> VarF a s
 
 instance IFunctor VarF where
     imap _ (Var n s)  = Var n s
@@ -50,7 +50,7 @@ instance IFunctor VarF where
 instance IShow VarF where
     ishow (Var n s)  = F.Const ("(" ++ n ++ " : " ++ show s ++ ")")
 
-var :: VarF :<: f => forall s. VariableName -> SSort s -> IFix f s
+var :: VarF :<: f => forall s. VariableName -> Sing s -> IFix f s
 var n s = inject (Var n s)
 
 data BoolF a (s :: Sort) where
