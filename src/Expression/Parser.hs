@@ -78,7 +78,9 @@ sort = choice [ bool, int, array ] <?> "Sort" where
 var :: forall f. VarF :<: f => Parser (DynamicallySorted f)
 var = var' <$> (char '(' *> many1 letter) <*> (space *> char ':' *> space *> sort <* char ')') <?> "Var" where
     var' :: VariableName -> DynamicSort -> DynamicallySorted f
-    var' n (DynamicSort (s :: SSort s)) = DynamicallySorted s $ E.var n s
+    var' n (DynamicSort (s :: SSort s)) =
+      -- This shouldn't be necessary once DynamicallySorted is fixed
+        withTypeableSort s $ DynamicallySorted s $ E.var n s
 
 bool :: forall f. BoolF :<: f => Parser (DynamicallySorted f) -> Parser (DynamicallySorted f)
 bool rec = choice [ true, false, and, or, not ] <?> "Bool" where
@@ -155,10 +157,13 @@ array rec = choice [ select, store ] <?> "Array" where
     select = select' <$> (char '(' *> string "select" *> space *> rec) <*> (space *> rec <* char ')')
     store  = store'  <$> (char '(' *> string "store"  *> space *> rec) <*> (space *> rec) <*> (space *> rec <* char ')')
 
-    select' (DynamicallySorted (SArraySort _ (es :: SSort s3)) (a :: IFix f s1))
-            (DynamicallySorted _                               (i :: IFix f s2)) = case eqT :: Maybe (s1 :~: ArraySort s2 s3) of
-                Just Refl -> DynamicallySorted es (E.select a i)
-                Nothing   -> error ""
+    select' :: DynamicallySorted f -> DynamicallySorted f -> DynamicallySorted f
+    select' (DynamicallySorted ss1@(SArraySort _ ss3) a)
+            (DynamicallySorted ss2                    i)
+               = case sortEq ss1 (SArraySort ss2 ss3) of
+                       Just Refl -> withTypeableSort ss3
+                                       $ DynamicallySorted ss3 (E.select a i)
+                       Nothing   -> error ""
     select' _ _ = error "selecting from non-array"
     store'  (DynamicallySorted as@(SArraySort _ _) (a :: IFix f s1))
             (DynamicallySorted _                   (i :: IFix f s2))

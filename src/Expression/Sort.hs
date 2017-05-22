@@ -12,7 +12,9 @@ data Sort = BooleanSort | IntegralSort | ArraySort { index :: Sort, element :: S
 data SSort :: Sort -> * where
     SBooleanSort  :: SSort BooleanSort
     SIntegralSort :: SSort IntegralSort
-    SArraySort    :: (Typeable i, Typeable e) => { sIndex :: SSort i, sElement :: SSort e } -> SSort (ArraySort i e)
+    SArraySort    :: { sIndex :: SSort i, sElement :: SSort e } -> SSort (ArraySort i e)
+
+
 
 show' :: Sort -> String
 show' BooleanSort     = "bool"
